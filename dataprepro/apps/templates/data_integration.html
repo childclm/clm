@@ -1,0 +1,977 @@
+{% extends 'base.html' %}
+
+{% block title %}数据集成{% endblock %}
+{% block style %}
+<style>
+    .content {
+        display: flex;
+        max-width: none !important;
+        overflow-x: auto; /* 允许横向滚动 */
+    }
+
+    .select_container {
+        overflow-x: auto; /* 允许横向滚动 */
+        display: flex;
+        gap: 50px;
+    }
+
+    .upload-section {
+        background: white;
+        color: black;
+        border: 2px dashed #ccc;
+        border-radius: 10px;
+        width: 400px;
+        padding: 20px;
+        text-align: center;
+    }
+
+    .button {
+        display: flex;
+        justify-content: center;
+        gap: 15px;
+        margin-top: 20px;
+    }
+
+    .message {
+        background-color: #d4edda;
+        color: #155724;
+        border-radius: 5px;
+        margin-bottom: 10px;
+    }
+
+
+    .preview-button, .cancel-button, .upload-button {
+        padding: 10px 15px;
+        background-color: #6a11cb;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        display: none;
+    }
+
+    .preview-button:hover, .cancel-button:hover, .upload-button:hover {
+        background-color: #2575fc;
+    }
+
+    .table-container {
+        max-height: 200px;
+        overflow-y: auto;
+        margin-top: 20px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        display: none;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    th, td {
+        border: 1px solid #ccc;
+        padding: 8px;
+        text-align: center;
+    }
+
+    th {
+        background-color: #f2f2f2;
+    }
+
+    .total-count {
+        margin-top: 10px;
+        font-weight: bold;
+    }
+
+    .loading-message {
+        display: none;
+        margin-top: 10px;
+        color: #007bff;
+    }
+
+    /* 进度条样式 */
+    #progress-container {
+        display: none;
+        margin-top: 10px;
+    }
+
+    .middle-button {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-top: 20px; /* 增加一些顶部空间 */
+        margin-bottom: 20px; /* 增加底部空间 */
+    }
+
+    .middle-action-button {
+        padding: 10px 20px;
+        background-color: #6B6662; /* 与页面风格一致的颜色 */
+        color: white;
+        font-size: 16px; /* 稍微大一些的字体 */
+        border: none;
+        border-radius: 8px; /* 圆角按钮 */
+        box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1); /* 添加阴影效果 */
+        cursor: pointer;
+        transition: background-color 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .middle-action-button:hover {
+        background-color: #5B5955; /* 鼠标悬停时稍微变暗 */
+        box-shadow: 0px 6px 10px rgba(0, 0, 0, 0.2); /* 鼠标悬停时增加阴影效果 */
+    }
+
+    .spinner {
+        border: 4px solid rgba(255, 255, 255, 0.3);
+        border-left-color: #fff;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+    }
+
+    .loading-indicator {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+        z-index: 1000;
+    }
+
+    .table-container {
+        position: relative;
+        width: 90%;
+        /* margin: 20px auto; */
+        border-radius: 8px;
+        font-family: Arial, sans-serif;
+        overflow-x: auto; /* 允许横向滚动 */
+        white-space: nowrap; /* 防止内容自动换行 */
+    }
+
+    .row {
+        display: flex;
+        padding: 5px;
+        /* border-bottom: 1px solid #ddd; */
+    }
+
+    .cell {
+        text-overflow: ellipsis; /* 当内容溢出时显示省略号 */
+        margin-left: 5px;
+        background-color: black;
+        flex: 1;
+        min-width: 100px; /* 最小宽度，防止内容过多挤在一起 */
+        width: 120px;
+        padding: 10px;
+        text-align: center;
+        border-left: 1px solid #ddd;
+        border-right: 1px solid #ddd;
+        position: relative;
+        cursor: pointer;
+    }
+
+    .cell:last-child {
+        border-right: none;
+    }
+
+    .popup {
+        background-color: #fff;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        padding: 10px;
+        max-height: 50px; /* 限制弹窗高度 */
+        overflow-y: auto; /* 超出内容时显示滚动条 */
+        display: none;
+        z-index: 10;
+        width: 100px; /* 固定宽度以保持样式一致 */
+    }
+
+    .popup-item {
+        padding: 5px 8px;
+        display: flex;
+        align-items: center;
+        font-size: 14px;
+        border-bottom: 1px solid #f1f1f1;
+        color: #333;
+        cursor: pointer;
+    }
+
+    .popup-item:last-child {
+        border-bottom: none;
+    }
+
+    .popup-item.empty {
+        color: #DFC6A3; /* 空值的特殊颜色 */
+    }
+
+    .popup-item span.icon {
+        margin-right: 5px;
+        color: #999;
+    }
+
+    .dataframe-container {
+        display: flex;
+        width: 90%;
+        flex-direction: column;
+        /* overflow-x: auto; */
+        /* overflow-y: auto; */
+        max-width: 100%;
+        border: 1px solid #ddd;
+        margin-top: 10px;
+        white-space: nowrap; /* 保证单元格不换行，从而支持水平滚动 */
+        box-sizing: border-box; /* 确保边框和内边距在宽度计算中 */
+    }
+
+    .dataframe-row {
+        display: flex;
+    }
+
+    .dataframe-cell.header {
+        font-weight: bold;
+        background-color: black !important;
+    }
+
+    .dataframe-row.header {
+        flex: 1 1 auto;
+        min-width: 100px;
+        background-color: #f0f0f0; /* 设置背景颜色 */
+        box-sizing: border-box; /* 确保 padding 不影响元素大小 */
+    }
+
+    .dataframe-cell {
+        background-color: gray;
+        border-bottom: 1px solid #ddd;
+        box-sizing: border-box; /* 确保边框和内边距在宽度计算中 */
+        flex: 1;
+        min-width: 150px; /* 设置列的最小宽度，保证有足够的横向滚动空间 */
+        padding: 8px;
+        text-align: center;
+        border-right: 1px solid #ddd;
+        white-space: nowrap; /* 防止内容换行，确保列宽一致 */
+        overflow: hidden;
+        text-overflow: ellipsis; /* 如果内容太长，用省略号显示 */
+    }
+
+    .pagination {
+        justify-content: left;
+        margin-top: 10px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .pagination button, .pagination input, .pagination select {
+        padding: 5px 10px;
+        cursor: pointer;
+    }
+
+    #save-file {
+        display: flex;
+        justify-content: left;
+    }
+
+    @keyframes spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="select_container">
+    <!-- 左边的文件上传区域 -->
+    <div class="upload-section">
+        <h3>左边上传区域</h3>
+        <input type="file" id="fileInputLeft" accept=".xlsx,.csv">
+        <div class="message" id="messageLeft"></div>
+        <div class="file-name" id="fileNameLeft"></div>
+        <div class="button">
+            <button id="previewButtonLeft" class="preview-button">预览文件</button>
+            <button id="cancelButtonLeft" class="cancel-button">取消预览</button>
+            <button id="uploadButtonLeft" class="upload-button">确认文件</button>
+        </div>
+        <div class="loading-message" id="loadingMessageLeft">加载中，请稍候...</div>
+        <div id="progress-container-left" style="display: none;">
+            <progress id="file-progress-left" value="0" max="100"></progress>
+            <span id="progress-percentage-left">0%</span>
+        </div>
+        <div class="table-container" id="tableContainerLeft">
+            <table id="dataTableLeft"></table>
+        </div>
+    </div>
+    <div class="middle-button">
+        <button id="actionButton" class="middle-action-button">开始处理</button>
+        <div class="loading-indicator" id="loadingIndicator" style="display:none;">
+            <div class="spinner"></div>
+            <p>正在加载中</p>
+        </div>
+    </div>
+
+    <!-- 右边的文件上传区域 -->
+    <div class="upload-section">
+        <h3>右边上传区域</h3>
+        <input type="file" id="fileInputRight" accept=".xlsx,.csv">
+        <div class="message" id="messageRight"></div>
+        <div class="file-name" id="fileNameRight"></div>
+        <div class="button">
+            <button id="previewButtonRight" class="preview-button">预览文件</button>
+            <button id="cancelButtonRight" class="cancel-button">取消预览</button>
+            <button id="uploadButtonRight" class="upload-button">确认文件</button>
+        </div>
+        <div class="loading-message" id="loadingMessageRight">加载中，请稍候...</div>
+        <div id="progress-container-right" style="display: none;">
+            <progress id="file-progress-right" value="0" max="100"></progress>
+            <span id="progress-percentage-right">0%</span>
+        </div>
+        <div class="table-container" id="tableContainerRight">
+            <table id="dataTableRight"></table>
+        </div>
+    </div>
+    <div class="table" style="display: none;">
+        <button id="save-file" class="btn btn-primary mt-3">保存文件</button>
+        <div id="tableContainer" class="table-container"></div>
+        <!-- 新的DataFrame展示区 -->
+        <div id="dataframe-container" class="dataframe-container">
+            <!-- 数据内容将在这里生成 -->
+        </div>
+        <div class="pagination">
+            <div class="total-count"></div>
+            <button id="prev-page">上一页</button>
+            <span id="page-info"></span>
+            <button id="next-page">下一页</button>
+            <input type="number" id="page-input" min="1" placeholder="跳转页码">
+            <span>每页显示</span>
+            <select id="rows-per-page">
+                <option value="10">10</option>
+                <option value="20">20</option>
+                <option value="50">50</option>
+            </select>
+            条
+        </div>
+    </div>
+    <div class="save_form" style="display: none;">
+        <form id="dataForm">
+            <input type="hidden" name="data" id="dataField"> <!-- 用于存储 data 的隐藏字段 -->
+            <label for="output_path">保存文件路径：</label>
+            <input type="text" name="output_path" placeholder="请输入文件保存路径" class="form-control mt-3">
+            <input type="submit" name="file_type" value="保存为csv文件" class="btn btn-primary mt-3">
+            <input type="submit" name="file_type" value='保存为xlsx文件' class="btn btn-primary mt-3">
+        </form>
+    </div>
+</div>
+
+<script>
+    let data;
+    let leftInitialized = false;
+    let rightInitialized = false;
+
+    document.getElementById('dataForm').addEventListener('submit', function (event) {
+        // 将 data 对象序列化为 JSON 字符串并存储到隐藏字段中
+        document.getElementById('dataField').value = JSON.stringify(data);
+        event.preventDefault(); // 阻止默认表单提交
+        const formData = new FormData(this);
+        const clickedButton = document.activeElement.value;
+        formData.append('file_type', clickedButton)
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        formData.append('csrf_token', csrfToken);
+        document.getElementById('loadingIndicator').style.display = 'block';
+        document.getElementsByClassName('middle-button')[0].style.display = 'block';
+        document.getElementById('actionButton').style.display = 'none';
+        fetch('/save_file', {
+            method: 'POST',
+            body: formData
+        })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    window.location.href = result.redirect_url; // 成功后跳转
+                } else {
+                    alert(result.message); // 提示错误消息
+                    document.getElementById('loadingIndicator').style.display = 'none'
+                    document.getElementsByClassName('save_form')[0].style.display = 'block'; // 保持输入框可见
+                }
+            })
+            .catch(error => {
+                console.error('发生错误:', error);
+                alert('文件保存时出错，请稍后再试。');
+            });
+    });
+
+    document.getElementById('save-file').addEventListener('click', saveFile)
+
+    function saveFile() {
+        document.getElementsByClassName('table')[0].style.display = 'none';
+        document.getElementsByClassName('save_form')[0].style.display = 'block';
+    }
+
+    document.getElementById('actionButton').addEventListener('click', function () {
+        if (!leftInitialized) {
+            alert('左边文件未选择')
+        } else if (!rightInitialized) {
+            alert('右边文件未选择')
+        } else {
+            // 获取文件
+            const fileLeft = document.getElementById('fileInputLeft').files[0];
+            const fileRight = document.getElementById('fileInputRight').files[0];
+
+            // 如果文件为空，返回提示
+            if (!fileLeft || !fileRight) {
+                alert('请先选择两个文件');
+                return;
+            }
+            // 使用 FormData 封装文件
+            const formData = new FormData();
+            formData.append('fileLeft', fileLeft);
+            formData.append('fileRight', fileRight);
+            const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+            formData.append('csrf_token', csrfToken);
+            const loadingIndicator = document.getElementById('loadingIndicator');
+            loadingIndicator.style.display = 'block';
+            // 发送文件到后端
+            fetch('/match', {
+                method: 'POST',
+                body: formData // 将文件附加到请求体中
+            })
+                .then(response => response.json())
+                .then(result => {
+                    data = result;
+                    // 隐藏所有的上传区域
+                    const uploadSections = document.getElementsByClassName('upload-section');
+                    for (let i = 0; i < uploadSections.length; i++) {
+                        uploadSections[i].style.display = 'none';
+                    }
+                    // 隐藏所有的中间按钮
+                    const middleButtons = document.getElementsByClassName('middle-button');
+                    for (let i = 0; i < middleButtons.length; i++) {
+                        middleButtons[i].style.display = 'none';
+                    }
+
+                    // 创建表格
+                    function createTable(data) {
+                        const table = document.getElementsByClassName('table');
+                        table[0].style.display = 'block';
+                        const tableContainer = document.getElementById('tableContainer');
+                        tableContainer.style.display = 'block';
+
+                        function createPopupContent(rowData, targetCell) {
+                            const popupDiv = document.createElement('div');
+                            popupDiv.className = 'popup';
+                            // 根据目标单元格的位置设置弹窗的位置
+                            const rect = targetCell.getBoundingClientRect();
+                            popupDiv.style.position = 'absolute';
+                            popupDiv.style.top = `-60px`; // 设置弹窗顶部位置
+                            popupDiv.style.left = `${rect.left}px`; // 设置弹窗左侧位置
+                            const nonEmptyItems = rowData.filter(item => item !== null);
+                            if (nonEmptyItems.length === 0) {
+                                const popupItem = document.createElement('div');
+                                popupItem.className = 'popup-item empty';
+                                popupItem.textContent = '空';
+                                popupDiv.appendChild(popupItem);
+                            } else {
+                                const popupItemNone = document.createElement('div');
+                                popupItemNone.className = 'popup-item';
+                                popupItemNone.innerHTML = `空`;
+                                popupItemNone.style.color = '#DFC6A3';
+                                popupItemNone.addEventListener('click', (el) => {
+                                    el.stopPropagation(); // 阻止事件传播，避免触发 cell 的点击事件
+                                    el.currentTarget.parentElement.parentElement.style.color = '#DFC6A3';
+                                    el.currentTarget.parentElement.parentElement.childNodes[0].nodeValue = '空';
+                                    popupDiv.style.display = 'none'; // 关闭弹窗
+                                    const leftData = el.currentTarget.parentElement.parentElement.parentElement.parentElement.children[1];
+                                    const mergeColumns = el.currentTarget.parentElement.parentElement.parentElement.parentElement.children[0];
+                                    const rightData = el.currentTarget.parentElement.parentElement.parentElement.parentElement.children[2];
+                                    let leftRowData = [];
+                                    let mergeData = []
+                                    let rightRowData = [];
+                                    for (let i = 1; i < leftData.children.length; i++) {
+                                        leftRowData.push(leftData.childNodes[i].getAttribute('data-value'));
+                                        mergeData.push(mergeColumns.childNodes[i].getAttribute('data-value'))
+                                        rightRowData.push(rightData.childNodes[i].getAttribute('data-value'));
+                                    }
+                                    document.getElementById('loadingIndicator').style.display = 'block';
+                                    document.getElementsByClassName('middle-button')[0].style.display = 'block';
+                                    document.getElementById('actionButton').style.display = 'none';
+                                    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+                                    // 将数据发送到后端
+                                    fetch('/handle_merge_data', {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                            'X-CSRF-Token': csrfToken
+                                        },
+                                        body: JSON.stringify({
+                                            leftRowData: leftRowData,
+                                            rightRowData: rightRowData,
+                                            mergeCloumns: mergeData
+                                        }),
+                                    })
+                                        .then(response => response.json())
+                                        .then(result => {
+                                            data.rows = result.rows;
+                                            data.columns = result.columns;
+                                            if (result.success) {
+                                                document.getElementsByClassName('middle-button')[0].style.display = 'none';
+                                                document.getElementsByClassName('dataframe-container')[0].style.color = null;
+                                                document.getElementsByClassName('dataframe-container')[0].style = null;
+                                                document.getElementsByClassName('pagination')[0].style.display = 'flex';
+                                                // 加载表格
+                                                loadData(data);
+                                            } else {
+                                                document.getElementsByClassName('middle-button')[0].style.display = 'none';
+                                                document.getElementsByClassName('dataframe-container')[0].textContent = '请正确完成合并';
+                                                document.getElementsByClassName('dataframe-container')[0].style.height = '100px';
+                                                document.getElementsByClassName('dataframe-container')[0].style.textAlign = 'left';
+                                                document.getElementsByClassName('dataframe-container')[0].style.color = 'red';
+                                                document.getElementsByClassName('pagination')[0].style.display = 'none';
+                                            }
+                                        })
+                                        .catch(error => {
+                                            alert('发送数据时出错:', error);
+                                        });
+                                })
+                                popupDiv.appendChild(popupItemNone);
+                                rowData.forEach(item => {
+                                    if (item !== null) {
+                                        const popupItem = document.createElement('div');
+                                        popupItem.className = 'popup-item';
+                                        popupItem.innerHTML = `${item}`;
+                                        popupItem.addEventListener('click', (el) => {
+                                            el.stopPropagation(); // 阻止事件传播，避免触发 cell 的点击事件
+                                            // 替换目标单元格的内容前检查其他单元格
+                                            el.currentTarget.parentElement.parentElement.parentElement.querySelectorAll('.cell').forEach(cell => {
+                                                if (cell.dataset.value === item) {
+                                                    cell.childNodes[0].nodeValue = '空';
+                                                    cell.style.color = '#DFC6A3';
+                                                    cell.dataset.value = '空';
+                                                }
+                                            });
+                                            // 设置目标单元格的内容
+                                            targetCell.childNodes[0].nodeValue = item;
+                                            if (item != null) {
+                                                targetCell.style.color = 'white';
+                                            } else {
+                                                targetCell.style.color = '#DFC6A3';
+                                            }
+                                            targetCell.dataset.value = item;
+                                            popupDiv.style.display = 'none'; // 关闭弹窗
+                                            const leftData = el.currentTarget.parentElement.parentElement.parentElement.parentElement.children[1];
+                                            const mergeColumns = el.currentTarget.parentElement.parentElement.parentElement.parentElement.children[0];
+                                            const rightData = el.currentTarget.parentElement.parentElement.parentElement.parentElement.children[2];
+                                            let leftRowData = [];
+                                            let mergeData = []
+                                            let rightRowData = [];
+                                            for (let i = 1; i < leftData.children.length; i++) {
+                                                leftRowData.push(leftData.childNodes[i].getAttribute('data-value'));
+                                                mergeData.push(mergeColumns.childNodes[i].getAttribute('data-value'))
+                                                rightRowData.push(rightData.childNodes[i].getAttribute('data-value'));
+                                            }
+                                            const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+                                            document.getElementById('loadingIndicator').style.display = 'block';
+                                            document.getElementsByClassName('middle-button')[0].style.display = 'block';
+                                            document.getElementById('actionButton').style.display = 'none';
+                                            fetch('/handle_merge_data', {
+                                                method: 'POST',
+                                                headers: {
+                                                    'Content-Type': 'application/json',
+                                                    'X-CSRF-Token': csrfToken
+                                                },
+                                                body: JSON.stringify({
+                                                    leftRowData: leftRowData,
+                                                    rightRowData: rightRowData,
+                                                    mergeCloumns: mergeData
+                                                }),
+                                            })
+                                                .then(response => response.json())
+                                                .then(result => {
+                                                    // 将数据发送到后端
+                                                    data.rows = result.rows;
+                                                    data.columns = result.columns;
+                                                    if (result.success) {
+                                                        document.getElementsByClassName('middle-button')[0].style.display = 'none';
+                                                        document.getElementsByClassName('dataframe-container')[0].style.color = null;
+                                                        document.getElementsByClassName('pagination')[0].style.display = 'flex';
+                                                        document.getElementsByClassName('dataframe-container')[0].style = null;
+                                                        // 加载表格
+                                                        loadData(data);
+                                                    } else {
+                                                        document.getElementsByClassName('dataframe-container')[0].textContent = '请正确完成合并';
+                                                        document.getElementsByClassName('middle-button')[0].style.display = 'none';
+                                                        document.getElementsByClassName('dataframe-container')[0].style.height = '100px';
+                                                        document.getElementsByClassName('dataframe-container')[0].style.textAlign = 'left';
+                                                        document.getElementsByClassName('dataframe-container')[0].style.color = 'red';
+                                                        document.getElementsByClassName('pagination')[0].style.display = 'none';
+                                                    }
+                                                })
+                                                .catch(error => {
+                                                    console.error('发送数据时出错:', error);
+                                                });
+                                        });
+                                        popupDiv.appendChild(popupItem);
+                                    }
+                                });
+                            }
+                            return popupDiv;
+                        }
+
+                        function createCell(content, rowData, editable = false) {
+                            const cell = document.createElement('div');
+                            cell.className = 'cell';
+                            cell.textContent = content || '空';
+                            cell.dataset.value = content || '空'; // 使用 data-value 存储原始内容
+                            if (!content) cell.style.color = '#DFC6A3';
+                            if (!editable) {
+                                const popup = createPopupContent(rowData, cell);
+                                cell.appendChild(popup);
+                                cell.addEventListener('click', (event) => {
+                                    event.stopPropagation(); // 阻止事件冒泡，避免触发关闭弹窗的事件
+                                    const isVisible = popup.style.display === 'block';
+                                    document.querySelectorAll('.popup').forEach(p => p.style.display = 'none'); // 关闭其他弹窗
+                                    popup.style.display = isVisible ? 'none' : 'block'; // 切换当前弹窗的显示状态
+                                });
+                            }
+                            return cell;
+                        }
+
+                        // 第一行: 合并结果 (可编辑)
+                        const mergeRow = document.createElement('div');
+                        mergeRow.className = 'row merge';
+                        const mergeRowHeader = document.createElement('div');
+                        mergeRowHeader.className = 'cell';
+                        mergeRowHeader.textContent = '合并结果';
+                        mergeRow.appendChild(mergeRowHeader);
+                        data.left.forEach((leftVal, index) => {
+                            const rightVal = data.right[index];
+                            const mergedValue = leftVal || rightVal || '空';
+                            const rowData = [leftVal, rightVal];
+                            mergeRow.appendChild(createCell(mergedValue, rowData, true));
+                        });
+                        tableContainer.appendChild(mergeRow);
+                        // 第二行: 左表数据
+                        const leftRow = document.createElement('div');
+                        const leftRowHeader = document.createElement('div');
+                        leftRowHeader.className = 'cell';
+                        leftRowHeader.textContent = '表' + data['table_name'][0];
+                        leftRow.appendChild(leftRowHeader);
+                        leftRow.className = 'row left';
+                        data.left.forEach(leftVal => {
+                            const rowData = data.left;
+                            leftRow.appendChild(createCell(leftVal, rowData));
+                        });
+                        tableContainer.appendChild(leftRow);
+
+                        // 第三行: 右表数据
+                        const rightRow = document.createElement('div');
+                        const rightRowHeader = document.createElement('div');
+                        rightRowHeader.className = 'cell';
+                        rightRowHeader.textContent = '表' + data['table_name'][1];
+                        rightRow.appendChild(rightRowHeader);
+                        rightRow.className = 'row right';
+                        data.right.forEach(rightVal => {
+                            const rowData = data.right;
+                            rightRow.appendChild(createCell(rightVal, rowData));
+                        });
+                        tableContainer.appendChild(rightRow);
+                    }
+
+                    function loadData(data) {
+                        const totalData = data.rows;
+                        totalRows = totalData.length;
+                        document.getElementsByClassName('total-count')[0].textContent = '共' + totalRows + '条数据'
+                        const startRow = (currentPage - 1) * rowsPerPage;
+                        const endRow = startRow + rowsPerPage;
+                        const paginatedRows = totalData.slice(startRow, endRow);
+
+                        const paginatedData = {
+                            columns: data.columns,
+                            rows: paginatedRows
+                        };
+
+                        renderDataFrameWithDivs(paginatedData);
+                    }
+
+                    // 点击空白区域关闭所有弹窗
+                    document.addEventListener('click', () => {
+                        document.querySelectorAll('.popup').forEach(p => p.style.display = 'none');
+                        document.querySelectorAll('.cell').forEach(c => c.classList.remove('active'));
+                    });
+                    let currentPage = 1;
+                    let rowsPerPage = 10;
+                    let totalRows = 0;
+
+                    function renderDataFrameWithDivs(data) {
+                        const container = document.getElementById("dataframe-container");
+                        container.innerHTML = "";  // 清空容器
+
+                        // 生成表头
+                        const headerRow = document.createElement("div");
+                        headerRow.classList.add("dataframe-row", "header");
+                        data.columns.forEach(column => {
+                            const columnDiv = document.createElement("div");
+                            columnDiv.classList.add("dataframe-cell", "header");
+                            columnDiv.contentEditable = 'true';
+                            columnDiv.addEventListener('focus', () => {
+                                columnDiv.style.backgroundColor = 'black';
+                            });
+                            columnDiv.addEventListener('blur', (el) => {
+                                columnDiv.style.backgroundColor = '';
+                                for (let i = 0; i < el.currentTarget.parentElement.childNodes.length; i++) {
+                                    data.columns[i] = el.currentTarget.parentElement.childNodes[i].textContent;
+                                }
+                            });
+                            columnDiv.textContent = column;
+                            headerRow.appendChild(columnDiv);
+                        });
+                        container.appendChild(headerRow);
+
+                        // 生成每一行的数据
+                        data.rows.forEach(row => {
+                            const rowDiv = document.createElement("div");
+                            rowDiv.classList.add("dataframe-row");
+                            row.forEach(cell => {
+                                const cellDiv = document.createElement("div");
+                                cellDiv.classList.add("dataframe-cell");
+                                cellDiv.textContent = cell;
+                                rowDiv.appendChild(cellDiv);
+                            });
+                            container.appendChild(rowDiv);
+                        });
+
+                        // 更新分页信息
+                        document.getElementById("page-info").textContent = `第 ${currentPage} 页，共 ${Math.ceil(totalRows / rowsPerPage)} 页`;
+                    }
+
+                    function changePage(direction) {
+                        currentPage += direction;
+                        if (currentPage < 1) currentPage = 1;
+                        loadData(data);
+                    }
+
+                    function changeRowsPerPage(value) {
+                        rowsPerPage = parseInt(value, 10);
+                        currentPage = 1;
+                        loadData(data);
+                    }
+
+                    function handlePageInput(event) {
+                        if (event.key === 'Enter') {
+                            const pageNumber = parseInt(event.target.value, 10);
+                            if (pageNumber > 0 && pageNumber <= Math.ceil(totalRows / rowsPerPage)) {
+                                currentPage = pageNumber;
+                                loadData(data);
+                            }
+                        }
+                    }
+
+                    document.getElementById('rows-per-page').addEventListener('change', function () {
+                        changeRowsPerPage(this.value)
+                    });
+                    document.getElementById('prev-page').addEventListener('click', function () {
+                        changePage(-1)
+                    });
+                    document.getElementById('next-page').addEventListener('click', function () {
+                        changePage(1)
+                    });
+                    document.getElementById('page-input').addEventListener('keydown', function () {
+                        handlePageInput(event)
+                    });
+                    createTable(data);
+                    // 加载表格
+                    loadData(data);
+                });
+        }
+    });
+    // 左边文件上传区域的逻辑
+    setupFileHandlers()(
+        'fileInputLeft', 'previewButtonLeft', 'cancelButtonLeft', 'uploadButtonLeft',
+        'messageLeft', 'tableContainerLeft', 'dataTableLeft', 'loadingMessageLeft',
+        'progress-container-left', 'file-progress-left', 'progress-percentage-left',
+        '/preview', '/uploadLeft', 'left'
+    );
+
+    // 右边文件上传区域的逻辑
+    setupFileHandlers()(
+        'fileInputRight', 'previewButtonRight', 'cancelButtonRight', 'uploadButtonRight',
+        'messageRight', 'tableContainerRight', 'dataTableRight', 'loadingMessageRight',
+        'progress-container-right', 'file-progress-right', 'progress-percentage-right',
+        '/preview', '/uploadRight', 'right'
+    );
+
+    // 通用的文件处理逻辑
+    function setupFileHandlers() {
+        // 闭包内部的变量，每个上传区域将会有各自独立的 uploadedFile 变量
+        let uploadedFile = null;
+
+        // 返回实际处理事件的函数，绑定不同的上传区域
+        return function (
+            fileInputId, previewButtonId, cancelButtonId, uploadButtonId,
+            messageId, tableContainerId, dataTableId, loadingMessageId,
+            progressContainerId, progressId, progressPercentageId,
+            previewUrl, uploadUrl, side
+        ) {
+            const fileInput = document.getElementById(fileInputId);
+            const message = document.getElementById(messageId);
+            const previewButton = document.getElementById(previewButtonId);
+            const cancelButton = document.getElementById(cancelButtonId);
+            const uploadButton = document.getElementById(uploadButtonId);
+            const tableContainer = document.getElementById(tableContainerId);
+            const dataTable = document.getElementById(dataTableId);
+            const loadingMessage = document.getElementById(loadingMessageId);
+            const progressContainer = document.getElementById(progressContainerId);
+            const fileProgress = document.getElementById(progressId);
+            const progressPercentage = document.getElementById(progressPercentageId);
+
+            fileInput.addEventListener('change', (e) => {
+                cancelButton.style.display = 'none';
+                const files = e.target.files;
+                handleFiles(files);
+            });
+
+            function handleFiles(files) {
+                if (files.length > 0) {
+                    const file = files[0];
+                    const fileType = file.type;
+                    const fileSize = file.size;
+                    message.style.padding = '10px';
+
+                    if (!validateFileType(fileType)) {
+                        message.textContent = '文件格式不支持，请上传 XLSX 或 CSV 格式的文件。';
+                        uploadButton.style.display = 'none';
+                        previewButton.style.display = 'none';
+                        uploadedFile = null;
+                        return;
+                    } else if (!validateFileSize(fileSize)) {
+                        message.textContent = '文件超出大小限制，请确保文件小于 500MB。';
+                        uploadButton.style.display = 'none';
+                        previewButton.style.display = 'none';
+                        uploadedFile = null;
+                        return;
+                    }
+                    uploadedFile = file;
+                    message.textContent = '文件符合！';
+                    uploadButton.style.display = 'block';
+                    previewButton.style.display = 'block';
+                }
+            }
+
+            function validateFileType(fileType) {
+                const validTypes = ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/csv'];
+                return validTypes.includes(fileType) || fileType === '';
+            }
+
+            function validateFileSize(fileSize) {
+                const maxSize = 500 * 1024 * 1024; // 500MB
+                return fileSize <= maxSize;
+            }
+
+            function displayTable(data) {
+                tableContainer.style.display = 'block'; // 显示表格容器
+                dataTable.innerHTML = ''; // 清空之前的表格数据
+
+                // 创建表头
+                const tableHeader = `<tr>${data.columns.map(col => `<th>${col}</th>`).join('')}</tr>`;
+                dataTable.innerHTML += tableHeader; // 添加表头到表格
+
+                // 创建表格行
+                const numRows = data[data.columns[0]].length; // 假设每列都有相同的行数
+                for (let i = 0; i < numRows; i++) {
+                    const tableRow = data.columns.map(col => `<td>${data[col][i]}</td>`).join('');
+                    dataTable.innerHTML += `<tr>${tableRow}</tr>`; // 添加行到表格
+                }
+            }
+
+            previewButton.addEventListener('click', () => {
+                if (uploadedFile) {
+                    loadingMessage.style.display = 'block';
+                    tableContainer.style.display = 'none';
+
+                    const formData = new FormData();
+                    formData.append('file', uploadedFile);
+                    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+                    formData.append('csrf_token', csrfToken);
+
+                    fetch(previewUrl, {
+                        method: 'POST',
+                        body: formData
+                    })
+                        .then(response => response.json())
+                        .then(data => {
+                            loadingMessage.style.display = 'none';
+                            if (data.columns && data.columns.length > 0) {
+                                displayTable(data);
+                                tableContainer.style.display = 'block';
+                                previewButton.style.display = 'none';
+                                cancelButton.style.display = 'block';
+                            } else {
+                                message.textContent = '预览失败，请检查文件内容。';
+                            }
+                        })
+                        .catch(error => {
+                            loadingMessage.style.display = 'none';
+                            message.textContent = '文件预览失败，请稍后重试。';
+                        });
+                }
+            });
+
+            cancelButton.addEventListener('click', () => {
+                tableContainer.style.display = 'none';
+                cancelButton.style.display = 'none';
+                previewButton.style.display = 'block';
+            });
+
+            uploadButton.addEventListener('click', () => {
+                if (uploadedFile) {
+                    progressContainer.style.display = 'block';
+                    const formData = new FormData();
+                    formData.append('file', uploadedFile);
+                    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+                    formData.append('csrf_token', csrfToken);
+
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('POST', uploadUrl, true);
+
+                    // 更新进度条
+                    xhr.upload.onprogress = (event) => {
+                        if (event.lengthComputable) {
+                            const percentComplete = (event.loaded / event.total) * 100;
+                            fileProgress.value = percentComplete;
+                            progressPercentage.textContent = Math.round(percentComplete) + '%';
+                        }
+                    };
+
+                    // 文件上传成功后处理响应
+                    xhr.onload = () => {
+                        if (xhr.status === 200) {
+                            const response = JSON.parse(xhr.responseText);
+                            if (response.success) {
+                                fileProgress.value = 100;
+                                progressPercentage.textContent = '100%';
+                                message.textContent = '文件选择成功';
+                                // 设置文件初始化状态
+                                if (side === 'left') {
+                                    leftInitialized = true;
+                                } else if (side === 'right') {
+                                    rightInitialized = true;
+                                }
+                            } else {
+                                message.textContent = '文件选择失败，请稍后重试。';
+                            }
+                        } else {
+                            message.textContent = '上传失败，请稍后重试。';
+                        }
+                    };
+
+                    // 文件上传失败的处理
+                    xhr.onerror = () => {
+                        message.textContent = '上传失败，请稍后重试。';
+                    };
+
+                    // 发送文件
+                    xhr.send(formData);
+                }
+            });
+        };
+    }
+</script>
+{% endblock %}

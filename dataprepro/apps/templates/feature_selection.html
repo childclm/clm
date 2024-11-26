@@ -1,0 +1,457 @@
+{% extends 'upload_data.html' %}
+{% block title %}特征选择{% endblock %}
+{% block style %}
+{{ super() }}
+<style>
+    /* 表格样式 */
+    .table {
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .table th {
+        background-color: #343a40;
+        color: #ffffff;
+        text-align: center;
+    }
+
+    .table td {
+        text-align: center;
+        vertical-align: middle;
+    }
+
+    .table-hover tbody tr:hover {
+        background-color: pink;
+    }
+
+    /* 搜索框样式 */
+    #searchInput {
+        border-radius: 20px;
+        padding: 10px 15px;
+        font-size: 16px;
+    }
+
+    #searchInput::placeholder {
+        font-style: italic;
+        color: #6c757d;
+    }
+
+    .gallery-container {
+        max-width: 1200px;
+        margin: 20px auto;
+        padding: 10px;
+        background: #fff;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        border-radius: 10px;
+        overflow-y: auto;
+        height: 80vh; /* 确保图片过多时有滚动条 */
+    }
+
+    h1 {
+        text-align: center;
+        color: #333;
+    }
+
+    .gallery {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        justify-content: center;
+    }
+
+    .gallery img {
+        width: 200px;
+        height: 200px;
+        object-fit: cover;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        cursor: pointer;
+    }
+
+    .gallery img:hover {
+        transform: scale(1.1);
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    }
+
+    /* 放大图片的模态框样式 */
+    .modal {
+        display: none; /* 默认隐藏 */
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.8);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .modal.active {
+        display: flex; /* 显示模态框 */
+    }
+
+    .modal img {
+        max-width: 90%;
+        max-height: 90%;
+        border-radius: 8px;
+        box-shadow: 0 4px 10px rgba(255, 255, 255, 0.5);
+    }
+
+    .close-btn {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        font-size: 30px;
+        font-weight: bold;
+        color: #fff;
+        text-decoration: none;
+        cursor: pointer;
+        transition: transform 0.2s ease-in-out;
+    }
+
+    .close-btn:hover {
+        transform: scale(1.2);
+    }
+
+    .nav-btn {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 40px;
+        color: #fff;
+        background: rgba(0, 0, 0, 0.5);
+        border: none;
+        cursor: pointer;
+        padding: 10px;
+        border-radius: 50%;
+        transition: background 0.2s ease-in-out;
+    }
+
+    .nav-btn:hover {
+        background: rgba(0, 0, 0, 0.8);
+    }
+
+    .prev-btn {
+        left: 20px;
+    }
+
+    .next-btn {
+        right: 20px;
+    }
+
+    .loading-indicator {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+        z-index: 1000;
+    }
+
+    .spinner {
+        border: 4px solid rgba(255, 255, 255, 0.3);
+        border-left-color: #fff;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+    }
+
+    .custom-checkbox-group {
+        max-height: 150px;
+        width: 400px;
+        overflow-y: auto;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        padding: 10px;
+        background-color: #f0f0f0;
+    }
+
+    .custom-checkbox {
+        display: flex;
+        align-items: center;
+        margin: 10px 0; /* 增加每行复选框之间的间距 */
+        padding: 5px; /* 给每个复选框一行加上内边距 */
+        border: 1px solid #ddd; /* 增加每行的边框 */
+        border-radius: 4px; /* 添加圆角 */
+        background-color: #fff; /* 每行的背景色为白色 */
+    }
+
+    .custom-checkbox input[type="checkbox"] {
+        margin-right: 10px;
+        transform: scale(1.2); /* 放大复选框 */
+    }
+
+    .custom-checkbox label {
+        cursor: pointer;
+        font-size: 14px;
+        color: #333;
+    }
+
+    .alert {
+        padding: 15px;
+        margin-top: 15px;
+        border: 1px solid transparent;
+        border-radius: 5px;
+        color: #856404; /* 警告文字颜色 */
+        background-color: #fff3cd; /* 背景色 */
+        border-color: #ffeeba; /* 边框颜色 */
+    }
+
+    @keyframes spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+</style>
+{% endblock %}
+{% block content %}
+<div class="container mt-5">
+    {% if step == 'file_selection' %}
+    <h2>选择要清洗的文件</h2>
+    <form action="{{ url_for('feature_selection') }}" method="POST" onsubmit="showLoadingIndicator()">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% if files %}
+        <select name="selected_file" class="form-control">
+            {% for key, value in files.items() %}
+            <option value="{{ key }}">{{ value }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-primary mt-3">确认文件</button>
+        {% else %}
+        <div class="alert alert-warning mt-3">未有处理后的文件，请先处理。</div>
+        {% endif %}
+    </form>
+    {% elif step == 'select_column' %}
+    <form action="{{ url_for('feature_selection_step') }}" method="POST" onsubmit="showLoadingIndicator()">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="step" value="enhance">
+        <h2>请选择目标列</h2>
+        <!-- 目标列选择部分 -->
+        <div class="form-group mt-4">
+            <div class="custom-checkbox-group" id="targetColumns">
+                {% for column in columns %}
+                <div class="custom-checkbox">
+                    <input type="checkbox" id="column-{{ column }}" name="target_column" value="{{ column }}">
+                    <label for="column-{{ column }}">{{ column }}</label>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        <h2>设置权重范围(0.0 - 1.0)</h2>
+        <div class="form-group mt-2">
+            <label for="weightInput" class="form-label">请输入增强权重:</label>
+            <input
+                    type="number"
+                    id="weightInput"
+                    name="weight_factor"
+                    value="weight_factor"
+                    class="form-control"
+                    placeholder="例如：0.5"
+                    step="0.01"
+                    min="0.0"
+                    max="1.0"
+                    required
+            >
+        </div>
+        <!-- 提交按钮 -->
+        <button type="submit" class="btn btn-primary mt-4">下一步</button>
+    </form>
+
+    {% elif step == 'enhancement_results' %}
+    <div class="gallery-container">
+        <h1>Enhance Image</h1>
+        <div class="gallery" id="gallery">
+            {% for img_path in imgs_path %}
+            <img src="{{ img_path}}" alt="Histogram">
+            {% endfor %}
+        </div>
+    </div>
+    <form action="{{ url_for('feature_selection_step') }}" method="POST" onsubmit="showLoadingIndicator()">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="step" value="feature_select">
+        <button type="submit" class="btn btn-primary mt-4">下一步</button>
+    </form>
+
+    <!-- 模态框 -->
+    <div class="modal" id="modal">
+        <a href="#" class="close-btn" id="close-btn">&times;</a>
+        <button class="nav-btn prev-btn" id="prev-btn">&#10094;</button>
+        <img id="modal-img" src="" alt="Expanded View">
+        <button class="nav-btn next-btn" id="next-btn">&#10095;</button>
+    </div>
+    {% elif step == 'parameter_omega' %}
+    <form action="{{ url_for('feature_selection_step') }}" method="POST" onsubmit="showLoadingIndicator()">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="step" value="feature_select">
+        <label for="weightInput" class="form-label">请输入邻域半径:</label>
+        <input
+                type="number"
+                id="parameter_omega"
+                name="parameter_omega"
+                value="parameter_omega"
+                class="form-control"
+                placeholder="例如：0.5"
+                step="0.01"
+                min="0.0"
+                max="1.0"
+                required
+        >
+        <button type="submit" class="btn btn-primary mt-4">确认</button>
+    </form>
+    {% elif step == 'feature_select' %}
+    <!-- 显示排序好的特征 -->
+    {% if feature_sort %}
+    <div class="form-group mt-4">
+        <h2 class="text-center mb-4">特征排序结果</h2>
+        <!-- 搜索框 -->
+        <div class="mb-3">
+            <input type="text" id="searchInput" class="form-control" placeholder="搜索特征名称或重要度...">
+        </div>
+
+        <!-- 表格容器，添加滚动条 -->
+        <div class="table-responsive"
+             style="max-height: 400px; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px;">
+            <table id="featureTable" class="table table-striped table-hover table-bordered">
+                <thead class="thead-dark">
+                <tr>
+                    <th scope="col">特征</th>
+                    <th scope="col">重要度</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for feature, importance in feature_sort.items() %}
+                <tr>
+                    <td>{{ feature }}</td>
+                    <td>{{ importance }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <button id="save-file" class="btn btn-primary mt-3">保存文件</button>
+    {% endif %}
+    {% elif step == 'save_select' %}
+    <div class="save_form">
+        <form action="{{ url_for('feature_selection_step') }}" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="step" value="save_feature_result">
+            <label for="output_path">保存文件路径：</label>
+            <input type="text" name="output_path" placeholder="请输入文件保存路径" class="form-control mt-3">
+            <input type="hidden" id="sortedFeatures" name="sorted_features">
+            <button type="submit" class="btn btn-primary mt-3">保存文件</button>
+        </form>
+    </div>
+    {% endif %}
+
+    <div class="loading-indicator" id="loadingIndicator" style="display: none;">
+        <div class="spinner"></div>
+        <p>正在加载中...</p>
+    </div>
+</div>
+<script>
+    const gallery = document.getElementById('gallery');
+    const modal = document.getElementById('modal');
+    const modalImg = document.getElementById('modal-img');
+    const closeBtn = document.getElementById('close-btn');
+    const prevBtn = document.getElementById('prev-btn');
+    const nextBtn = document.getElementById('next-btn');
+
+    let currentIndex = 0;
+    const images = Array.from(gallery.querySelectorAll('img'));
+
+    // 打开模态框
+    const openModal = (index) => {
+        currentIndex = index;
+        modalImg.src = images[currentIndex].src;
+        modal.classList.add('active');
+    };
+
+    // 关闭模态框
+    const closeModal = () => {
+        modal.classList.remove('active');
+    };
+
+    // 切换到上一张图片
+    const showPrev = () => {
+        currentIndex = (currentIndex - 1 + images.length) % images.length;
+        modalImg.src = images[currentIndex].src;
+    };
+
+    // 切换到下一张图片
+    const showNext = () => {
+        currentIndex = (currentIndex + 1) % images.length;
+        modalImg.src = images[currentIndex].src;
+    };
+
+    // 点击图片打开模态框
+    images.forEach((img, index) => {
+        img.addEventListener('click', () => openModal(index));
+    });
+
+    // 绑定关闭按钮事件
+    closeBtn.addEventListener('click', closeModal);
+
+    // 绑定上一张按钮事件
+    prevBtn.addEventListener('click', showPrev);
+
+    // 绑定下一张按钮事件
+    nextBtn.addEventListener('click', showNext);
+
+    // 点击模态框外部关闭
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeModal();
+    });
+</script>
+<script>
+    // 动态搜索功能
+    document.getElementById('searchInput').addEventListener('keyup', function () {
+        const searchValue = this.value.toLowerCase(); // 获取输入框中的值
+        const rows = document.querySelectorAll('#featureTable tbody tr'); // 获取表格的所有行
+
+        rows.forEach(row => {
+            const cells = row.querySelectorAll('td'); // 获取每行的单元格
+            const feature = cells[0].innerText.toLowerCase(); // 特征名（第一列）
+            const importance = cells[1].innerText.toLowerCase(); // 重要度（第二列）
+
+            // 如果搜索值匹配特征名或重要度，显示该行，否则隐藏
+            if (feature.includes(searchValue) || importance.includes(searchValue)) {
+                row.style.display = ''; // 显示
+            } else {
+                row.style.display = 'none'; // 隐藏
+            }
+        });
+    });
+    document.getElementById("save-file").addEventListener("click", function () {
+        // 创建表单
+        const form = document.createElement("form");
+        form.method = "POST";
+        form.action = "{{ url_for('feature_selection_step') }}";
+        // 添加 CSRF Token
+        const csrfInput = document.createElement("input");
+        csrfInput.type = "hidden";
+        csrfInput.name = "csrf_token";
+        csrfInput.value = "{{ csrf_token() }}";
+        form.appendChild(csrfInput);
+        // 添加 step 值
+        const stepInput = document.createElement("input");
+        stepInput.type = "hidden";
+        stepInput.name = "step";
+        stepInput.value = "save_select"; // 跳转到保存路径输入页面
+        form.appendChild(stepInput);
+        // 提交表单
+        document.body.appendChild(form);
+        form.submit();
+    });
+</script>
+<script>
+    function showLoadingIndicator() {
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        loadingIndicator.style.display = 'block';
+    };
+</script>
+{% endblock %}

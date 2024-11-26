@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Table with Dropdown</title>
+    <style>
+        .table-container {
+            position: relative;
+            width: 90%;
+            margin: 20px auto;
+            border-radius: 8px;
+            font-family: Arial, sans-serif;
+            overflow-x: auto; /* 允许横向滚动 */
+            white-space: nowrap; /* 防止内容自动换行 */
+        }
+
+        .row {
+            display: flex;
+            padding: 5px;
+            /* border-bottom: 1px solid #ddd; */
+        }
+
+        .cell {
+            margin-left: 5px;
+            background-color: #F8F9FC;
+            flex: 1;
+            min-width: 100px; /* 最小宽度，防止内容过多挤在一起 */
+            width: 120px;
+            padding: 10px;
+            text-align: center;
+            border-left: 1px solid #ddd;
+            border-right: 1px solid #ddd;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .cell:last-child {
+            border-right: none;
+        }
+
+        .popup {
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            padding: 10px;
+            max-height: 50px; /* 限制弹窗高度 */
+            overflow-y: auto; /* 超出内容时显示滚动条 */
+            display: none;
+            z-index: 10;
+            width: 100px; /* 固定宽度以保持样式一致 */
+        }
+
+        .popup-item {
+            padding: 5px 8px;
+            display: flex;
+            align-items: center;
+            font-size: 14px;
+            border-bottom: 1px solid #f1f1f1;
+            color: #333;
+            cursor: pointer;
+        }
+
+        .popup-item:last-child {
+            border-bottom: none;
+        }
+
+        .popup-item.empty {
+            color: #DFC6A3; /* 空值的特殊颜色 */
+        }
+
+        .popup-item span.icon {
+            margin-right: 5px;
+            color: #999;
+        }
+
+        .dataframe-container {
+            display: flex;
+            width: 90%;
+            margin: 20px auto;
+            flex-direction: column;
+            overflow-x: auto;    
+            overflow-y: auto;
+            max-width: 100%;
+            border: 1px solid #ddd;
+            margin-top: 10px;
+            white-space: nowrap; /* 保证单元格不换行，从而支持水平滚动 */
+            box-sizing: border-box; /* 确保边框和内边距在宽度计算中 */
+        }
+
+        .dataframe-row {
+            display: flex;
+        }
+
+        .dataframe-cell.header {
+            font-weight: bold;
+            background-color: #f5f5f5 !important;
+        }
+        .dataframe-row.header {
+            flex: 1 1 auto;
+            min-width: 100px;
+            background-color: #f0f0f0; /* 设置背景颜色 */
+            box-sizing: border-box; /* 确保 padding 不影响元素大小 */
+        }
+
+        .dataframe-cell {
+            border-bottom: 1px solid #ddd;
+            box-sizing: border-box; /* 确保边框和内边距在宽度计算中 */
+            flex: 1;
+            min-width: 150px; /* 设置列的最小宽度，保证有足够的横向滚动空间 */
+            padding: 8px;
+            text-align: center;
+            border-right: 1px solid #ddd;
+            white-space: nowrap; /* 防止内容换行，确保列宽一致 */
+            overflow: hidden;
+            text-overflow: ellipsis; /* 如果内容太长，用省略号显示 */
+        }
+
+        .pagination {
+            justify-content: center;
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .pagination button, .pagination input, .pagination select {
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+
+
+    </style>
+</head>
+<body>
+    <div>
+<div id="tableContainer" class="table-container"></div>
+<!-- 新的DataFrame展示区 -->
+<div id="dataframe-container" class="dataframe-container">
+    <!-- 数据内容将在这里生成 -->
+</div>
+<div class="pagination">
+    <div class="total-count"></div>
+    <button id="prev-page" onclick="changePage(-1)">上一页</button>
+    <span id="page-info"></span>
+    <button id="next-page" onclick="changePage(1)">下一页</button>
+    <input type="number" id="page-input" min="1" placeholder="跳转页码" onkeydown="handlePageInput(event)">
+    <span>每页显示</span>
+    <select id="rows-per-page" onchange="changeRowsPerPage(this.value)">
+        <option value="10">10</option>
+        <option value="20">20</option>
+        <option value="50">50</option>
+    </select>
+    条
+</div>
+</div>
+<script>
+    const data = {
+        "left": ["name", "cody", "title", "arer", "sdft", "age", null, null, null, null, null, null, null],
+        "right": ["name", null, null, null, null, null, "trea", "title", null, null, null, null, null],
+        "table_name": ["1", "2"]
+    };
+
+    function createTable(data) {
+        const tableContainer = document.getElementById('tableContainer');
+
+        function createPopupContent(rowData, targetCell) {
+            const popupDiv = document.createElement('div');
+            popupDiv.className = 'popup';
+
+            // 根据目标单元格的位置设置弹窗的位置
+            const rect = targetCell.getBoundingClientRect();
+            popupDiv.style.position = 'absolute';
+            popupDiv.style.top = `-60px`; // 设置弹窗顶部位置
+            popupDiv.style.left = `${rect.left}px`; // 设置弹窗左侧位置
+
+            const nonEmptyItems = rowData.filter(item => item !== null);
+            if (nonEmptyItems.length === 0) {
+                const popupItem = document.createElement('div');
+                popupItem.className = 'popup-item empty';
+                popupItem.textContent = '空';
+                popupDiv.appendChild(popupItem);
+            } else {
+                const popupItemNone = document.createElement('div');
+                popupItemNone.className = 'popup-item';
+                popupItemNone.innerHTML = `空`;
+                popupItemNone.style.color = '#DFC6A3';
+                popupItemNone.addEventListener('click', (el) => {
+                    el.stopPropagation(); // 阻止事件传播，避免触发 cell 的点击事件
+                    el.currentTarget.parentElement.parentElement.style.color = '#DFC6A3';
+                    el.currentTarget.parentElement.parentElement.childNodes[0].nodeValue = '空';
+                })
+                popupDiv.appendChild(popupItemNone);
+                rowData.forEach(item => {
+                    if (item !== null) {
+                        const popupItem = document.createElement('div');
+                        popupItem.className = 'popup-item';
+                        popupItem.innerHTML = `${item}`;
+                        popupItem.addEventListener('click', (el) => {
+                            el.stopPropagation(); // 阻止事件传播，避免触发 cell 的点击事件
+                            // 替换目标单元格的内容前检查其他单元格
+                            el.currentTarget.parentElement.parentElement.parentElement.querySelectorAll('.cell').forEach(cell => {
+                                if (cell.dataset.value === item) {
+                                    cell.childNodes[0].nodeValue = '空';
+                                    cell.style.color = '#DFC6A3';
+                                    cell.dataset.value = '空';
+                                }
+                            });
+                            // 设置目标单元格的内容
+                            targetCell.childNodes[0].nodeValue = item;
+                            targetCell.style.color = 'black'; // 重置字体颜色
+                            targetCell.dataset.value = item;
+                            popupDiv.style.display = 'none'; // 关闭弹窗
+                            const leftData = el.currentTarget.parentElement.parentElement.parentElement.parentElement.children[1];
+                            const rightData = el.currentTarget.parentElement.parentElement.parentElement.parentElement.children[2];
+                            let leftRowData = [];
+                            let rightRowData = [];
+                            for (let i = 1; i < leftData.children.length; i++) {
+                                leftRowData.push(leftData.childNodes[i].getAttribute('data-value'))
+                                rightRowData.push(rightData.childNodes[i].getAttribute('data-value'))
+                            }
+                        });
+                        popupDiv.appendChild(popupItem);
+                    }
+                });
+            }
+            return popupDiv;
+        }
+
+        function createCell(content, rowData, editable = false) {
+            const cell = document.createElement('div');
+            cell.className = 'cell';
+            cell.textContent = content || '空';
+            cell.dataset.value = content || '空'; // 使用 data-value 存储原始内容
+            if (!content) cell.style.color = '#DFC6A3';
+
+            if (editable) {
+                cell.contentEditable = 'true';
+                cell.addEventListener('focus', () => {
+                    cell.style.backgroundColor = '#f0f8ff';
+                });
+                cell.addEventListener('blur', () => {
+                    cell.style.backgroundColor = '';
+                });
+            } else {
+                const popup = createPopupContent(rowData, cell);
+                cell.appendChild(popup);
+
+                cell.addEventListener('click', (event) => {
+                    event.stopPropagation(); // 阻止事件冒泡，避免触发关闭弹窗的事件
+                    const isVisible = popup.style.display === 'block';
+                    document.querySelectorAll('.popup').forEach(p => p.style.display = 'none'); // 关闭其他弹窗
+                    popup.style.display = isVisible ? 'none' : 'block'; // 切换当前弹窗的显示状态
+                });
+            }
+            return cell;
+        }
+
+        // 第一行: 合并结果 (可编辑)
+        const mergeRow = document.createElement('div');
+        mergeRow.className = 'row merge';
+        const mergeRowHeader = document.createElement('div');
+        mergeRowHeader.className = 'cell';
+        mergeRowHeader.textContent = '合并结果';
+        mergeRow.appendChild(mergeRowHeader);
+        data.left.forEach((leftVal, index) => {
+            const rightVal = data.right[index];
+            const mergedValue = leftVal || rightVal || '空';
+            const rowData = [leftVal, rightVal];
+            mergeRow.appendChild(createCell(mergedValue, rowData, true));
+        });
+        tableContainer.appendChild(mergeRow);
+
+        // 第二行: 左表数据
+        const leftRow = document.createElement('div');
+        const leftRowHeader = document.createElement('div');
+        leftRowHeader.className = 'cell';
+        leftRowHeader.textContent = '表' + data['table_name'][0];
+        leftRow.appendChild(leftRowHeader);
+        leftRow.className = 'row left';
+        data.left.forEach(leftVal => {
+            const rowData = data.left;
+            leftRow.appendChild(createCell(leftVal, rowData));
+        });
+        tableContainer.appendChild(leftRow);
+
+        // 第三行: 右表数据
+        const rightRow = document.createElement('div');
+        const rightRowHeader = document.createElement('div');
+        rightRowHeader.className = 'cell';
+        rightRowHeader.textContent = '表' + data['table_name'][1];
+        rightRow.appendChild(rightRowHeader);
+        rightRow.className = 'row right';
+        data.right.forEach(rightVal => {
+            const rowData = data.right;
+            rightRow.appendChild(createCell(rightVal, rowData));
+        });
+        tableContainer.appendChild(rightRow);
+    }
+
+    createTable(data);
+
+    let currentPage = 1;
+    let rowsPerPage = 10;
+    let totalRows = 0;
+
+    function renderDataFrameWithDivs(data) {
+        const container = document.getElementById("dataframe-container");
+        container.innerHTML = "";  // 清空容器
+
+        // 生成表头
+        const headerRow = document.createElement("div");
+        headerRow.classList.add("dataframe-row", "header");
+        data.columns.forEach(column => {
+            const columnDiv = document.createElement("div");
+            columnDiv.classList.add("dataframe-cell", "header");
+            columnDiv.textContent = column;
+            headerRow.appendChild(columnDiv);
+        });
+        container.appendChild(headerRow);
+
+        // 生成每一行的数据
+        data.rows.forEach(row => {
+            const rowDiv = document.createElement("div");
+            rowDiv.classList.add("dataframe-row");
+            row.forEach(cell => {
+                const cellDiv = document.createElement("div");
+                cellDiv.classList.add("dataframe-cell");
+                cellDiv.textContent = cell;
+                rowDiv.appendChild(cellDiv);
+            });
+            container.appendChild(rowDiv);
+        });
+
+        // 更新分页信息
+        document.getElementById("page-info").textContent = `第 ${currentPage} 页，共 ${Math.ceil(totalRows / rowsPerPage)} 页`;
+    }
+
+    function changePage(direction) {
+        currentPage += direction;
+        if (currentPage < 1) currentPage = 1;
+        loadData();
+    }
+
+    function changeRowsPerPage(value) {
+        rowsPerPage = parseInt(value, 10);
+        currentPage = 1;
+        loadData();
+    }
+
+    function handlePageInput(event) {
+        if (event.key === 'Enter') {
+            const pageNumber = parseInt(event.target.value, 10);
+            if (pageNumber > 0 && pageNumber <= Math.ceil(totalRows / rowsPerPage)) {
+                currentPage = pageNumber;
+                loadData();
+            }
+        }
+    }
+
+    function loadData() {
+        const totalData = exampleData.rows;
+        totalRows = totalData.length;
+        document.getElementsByClassName('total-count')[0].textContent = '共'+totalRows+'条数据'
+        const startRow = (currentPage - 1) * rowsPerPage;
+        const endRow = startRow + rowsPerPage;
+        const paginatedRows = totalData.slice(startRow, endRow);
+
+        const paginatedData = {
+            columns: exampleData.columns,
+            rows: paginatedRows
+        };
+
+        renderDataFrameWithDivs(paginatedData);
+    }
+
+    // 示例数据
+    const exampleData = {
+        columns: ["Column1", "Column2", "Column3", "Column4", "Column5", "Column6", "Column7", "Column8", "Column9", "Column10", "Column11", "Column12", 'Column13', 'Column14'],
+        rows: Array.from({length: 100}, (_, i) =>
+            ["Data" + (i + 1), "Data" + (i + 2), "Data" + (i + 3), "Data" + (i + 4), "Data" + (i + 5), "Data" + (i + 6), "Data" + (i + 7), "Data" + (i + 8), "Data" + (i + 9), "Data" + (i + 10), "Data" + (i +11), "Data" +(i+12), "Data"+ (i+13), "Data"+(i+14)]
+        )
+    };
+
+    // 初始化数据
+    loadData();
+
+</script>
+</body>
+</html>

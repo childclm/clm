@@ -1,0 +1,238 @@
+{% extends 'base.html' %}
+{% block content %}
+{% block style %}
+{{ super() }}
+<style>
+    .loading-indicator {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+        z-index: 1000;
+    }
+
+    .spinner {
+        border: 4px solid rgba(255, 255, 255, 0.3);
+        border-left-color: #fff;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+    }
+
+    .custom-checkbox-group {
+        max-height: 150px;
+        width: 500px;
+        overflow-y: auto;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        padding: 10px;
+        background-color: #f0f0f0;
+    }
+
+    .custom-checkbox {
+        display: flex;
+        align-items: center;
+        margin: 10px 0; /* 增加每行复选框之间的间距 */
+        padding: 5px; /* 给每个复选框一行加上内边距 */
+        border: 1px solid #ddd; /* 增加每行的边框 */
+        border-radius: 4px; /* 添加圆角 */
+        background-color: #fff; /* 每行的背景色为白色 */
+    }
+
+    .custom-checkbox input[type="checkbox"] {
+        margin-right: 10px;
+        transform: scale(1.2); /* 放大复选框 */
+    }
+
+    .custom-checkbox label {
+        cursor: pointer;
+        font-size: 14px;
+        color: #333;
+    }
+
+    .alert {
+        padding: 15px;
+        margin-top: 15px;
+        border: 1px solid transparent;
+        border-radius: 5px;
+        color: #856404; /* 警告文字颜色 */
+        background-color: #fff3cd; /* 背景色 */
+        border-color: #ffeeba; /* 边框颜色 */
+    }
+
+    @keyframes spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+</style>
+{% endblock %}
+
+<script>
+    function showLoadingIndicator() {
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        loadingIndicator.style.display = 'block';
+    };
+
+    function toggleSelectAll(selectAllCheckbox) {
+        const checkboxes = document.querySelectorAll('input[type="checkbox"][name="columns"]');
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = selectAllCheckbox.checked;
+        });
+    };
+</script>
+
+<div class="container mt-5">
+    <!-- 文件选择步骤 -->
+    {% if step == 'file_selection' %}
+    <h2>选择要清洗的文件</h2>
+    <form action="{{ url_for('data_cleaning') }}" method="POST" onsubmit="showLoadingIndicator()">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% if files %}
+        <select name="selected_file" class="form-control">
+            {% for key, value in files.items() %}
+            <option value="{{ key }}">{{ value }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-primary mt-3">确认文件</button>
+        {% else %}
+        <div class="alert alert-warning mt-3">未上传文件，请先上传文件。</div>
+        {% endif %}
+    </form>
+    <div class="loading-indicator" id="loadingIndicator" style="display: none;">
+        <div class="spinner"></div>
+        <p>正在加载中...</p>
+    </div>
+
+    <!-- 指定列去重部分 -->
+    {% elif step == 'column_duplicate_removal' %}
+    <form action="{{ url_for('data_cleaning_step') }}" method="POST" onsubmit="showLoadingIndicator()">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="step" value="column_duplicate_removal">
+        <label for="columns">请选择要去重的列：</label>
+        <div class="custom-checkbox-group">
+            <div class="custom-checkbox">
+                <input type="checkbox" id="select_all" onclick="toggleSelectAll(this)">
+                <label for="select_all">全选</label>
+            </div>
+            {% for column in columns %}
+            <div class="custom-checkbox">
+                <input type="checkbox" name="columns" value="{{ column }}" id="{{ column }}">
+                <label for="{{ column }}">{{ column }}</label>
+            </div>
+            {% endfor %}
+        </div>
+        <button type="submit" class="btn btn-primary mt-3" name="action" value="remove_duplicates">执行去重</button>
+    </form>
+    <div class="loading-indicator" id="loadingIndicator" style="display: none;">
+        <div class="spinner"></div>
+        <p>正在加载中...</p>
+    </div>
+
+
+    <!-- 展示去重前后的条数变化 -->
+    {% if original_count and cleaned_count %}
+    <p>处理前的数据条数：{{ original_count }}</p>
+    <p>处理后的数据条数：{{ cleaned_count }}</p>
+    {% endif %}
+    <!-- 下一步按钮 -->
+    <form action="{{ url_for('data_cleaning_step') }}" method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="step" value="outlier_detection">
+        <button type="submit" class="btn btn-primary mt-3">下一步：异常值处理</button>
+    </form>
+    
+
+    <!-- 异常值检测步骤 -->
+    {% elif step == 'outlier_detection' %}
+    <h3 class="mt-5">异常值检测</h3>
+    <form action="{{ url_for('data_cleaning_step') }}" method="POST" onsubmit="showLoadingIndicator()">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="step" value="outlier_detection">
+        <label for="outlier_action">请选择对异常值的处理方式：</label>
+        <select name="outlier_action" class="form-control">
+            <option value="delete">删除</option>
+            <option value="replace_zero">替换为 0</option>
+            <option value="replace_mean">替换为均值</option>
+            <option value="replace_mode">替换为众数</option>
+        </select>
+        <button type="submit" class="btn btn-primary mt-3">处理异常值</button>
+    </form>
+    <div class="loading-indicator" id="loadingIndicator" style="display: none;">
+        <div class="spinner"></div>
+        <p>正在加载中...</p>
+    </div>
+
+    <!-- 展示前后变化 -->
+    {% if original_count and cleaned_count %}
+    <p>处理前的数据条数：{{ original_count }}</p>
+    <p>处理后的数据条数：{{ cleaned_count }}</p>
+    {% endif %}
+    <!-- 下一步按钮 -->
+    <form action="{{ url_for('data_cleaning_step') }}" method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="step" value="missing_value_info">
+        <button type="submit" class="btn btn-primary mt-3">下一步：缺失值处理</button>
+    </form>
+
+    {% elif step == 'missing_value_info' %}
+    <h3>缺失值处理</h3>
+    <form action="{{ url_for('data_cleaning_step') }}" method="POST" onsubmit="showLoadingIndicator()">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="step" value="missing_value_handling">
+        <label for="columns">请选择要处理的列：</label>
+        <div class="custom-checkbox-group">
+            <!-- 全选复选框 -->
+            <div class="custom-checkbox">
+                <input type="checkbox" id="select_all" onclick="toggleSelectAll(this)">
+                <label for="select_all">全选</label>
+            </div>
+            <!-- 列出每个缺失值的列 -->
+            {% for column, missing_count in missing_info.items() %}
+            <div class="custom-checkbox">
+                <input type="checkbox" name="columns" value="{{ column }}" id="{{ column }}">
+                <label for="{{ column }}">{{ column }} 空值数量: {{ missing_count }}</label>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- 提交按钮 -->
+        <button type="submit" class="btn btn-primary mt-3" name="action" value="delete_missing">删除缺失值</button>
+        <button type="submit" class="btn btn-primary mt-3" name="action" value="handling_categorical_missing">
+            处理分类型缺失值
+        </button>
+        <button type="submit" class="btn btn-primary mt-3" name="action" value="handling_number_missing">
+            处理数值型缺失值
+        </button>
+    </form>
+    <div class="loading-indicator" id="loadingIndicator" style="display: none;">
+        <div class="spinner"></div>
+        <p>正在加载中...</p>
+    </div>
+    <!-- 下一步按钮 -->
+    <form action="{{ url_for('data_cleaning_step') }}" method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="step" value="save_cleaned_data">
+        <button type="submit" class="btn btn-primary mt-3">保存文件</button>
+    </form>
+
+    <!-- 最终保存步骤 -->
+    {% elif step == 'save_cleaned_data' %}
+    <form action="{{ url_for('data_cleaning_step') }}" method="POST" onsubmit="showLoadingIndicator()">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="step" value="save_cleaned_data">
+        <label for="output_path">保存文件路径：</label>
+        <input type="text" name="output_path" placeholder="请输入文件保存路径" class="form-control mt-3">
+        <button type="submit" class="btn btn-primary mt-3">保存文件</button>
+    </form>
+    <div class="loading-indicator" id="loadingIndicator" style="display: none;">
+        <div class="spinner"></div>
+        <p>正在加载中...</p>
+    </div>
+
+    {% endif %}
+</div>
+{% endblock %}
+

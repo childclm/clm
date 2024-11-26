@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div id="welcome-message" style="font-size: 2em; white-space: nowrap; overflow: hidden; display: inline-block;"></div>
+
+<script>
+    const message = "欢迎来到数据预处理平台！";
+    const welcomeElement = document.getElementById('welcome-message');
+    const colors = ["#FF5733", "#33FF57", "#3357FF", "#FF33A1", "#FFB733"]; // 多种颜色
+    let index = 0;
+    let isTyping = true;
+
+    function type() {
+        if (isTyping) {
+            if (index < message.length) {
+                const span = document.createElement('span');
+                span.textContent = message.charAt(index);
+                span.style.color = colors[index % colors.length]; // 使用颜色数组
+                welcomeElement.appendChild(span);
+                index++;
+                setTimeout(type, 200); // 每个字母出现的时间间隔
+            } else {
+                isTyping = false; // 切换到回滚状态
+                setTimeout(type, 1000); // 完成后等待 1 秒
+            }
+        } else {
+            if (index > 0) {
+                const spans = welcomeElement.getElementsByTagName('span');
+                welcomeElement.removeChild(spans[index - 1]); // 移除最后一个字符
+                index--;
+                setTimeout(type, 100); // 每个字母回滚的时间间隔
+            } else {
+                isTyping = true; // 切换到输入状态
+                setTimeout(type, 1000); // 回滚后等待 1 秒
+            }
+        }
+    }
+
+    type(); // 开始动画
+
+</script>
+{% endblock %}

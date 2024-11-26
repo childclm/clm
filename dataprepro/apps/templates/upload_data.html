@@ -1,0 +1,319 @@
+{% extends 'base.html' %}
+{% block title %}文件上传{% endblock %}
+{% block style %}
+<style>
+    .button {
+        display: flex; /* 使用 flexbox 布局 */
+        justify-content: center; /* 水平居中对齐 */
+        gap: 15px; /* 按钮之间的间距 */
+        margin-top: 20px; /* 上方间距 */
+    }
+
+    .upload-container {
+        background: white;
+        color: black;
+        border: 2px dashed #ccc;
+        border-radius: 10px;
+        width: 400px;
+        padding: 20px;
+        text-align: center;
+    }
+
+    .upload-area {
+        padding: 20px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+    }
+
+    .upload-area:hover {
+        background-color: #f9f9f9;
+    }
+
+    .message {
+        background-color: #d4edda;
+        color: #155724;
+        border-radius: 5px;
+        margin-bottom: 10px;
+    }
+
+    .file-name {
+        margin-top: 10px;
+        color: green;
+        font-weight: bold;
+    }
+
+    .preview-button, .cancel-button, .upload-button {
+        padding: 10px 15px;
+        background-color: #6a11cb;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        display: none; /* 初始隐藏 */
+    }
+
+    .preview-button:hover, .cancel-button:hover, .upload-button:hover {
+        background-color: #2575fc;
+    }
+
+    .table-container {
+        max-height: 200px;
+        overflow-y: auto;
+        margin-top: 20px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        display: none;
+    }
+
+    table {
+        white-space: nowrap;
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    th, td {
+        border: 1px solid #ccc;
+        padding: 8px;
+        text-align: left;
+    }
+
+    th {
+        background-color: #f2f2f2;
+    }
+
+    .total-count {
+        margin-top: 10px;
+        font-weight: bold;
+    }
+
+    .loading-message {
+        display: none;
+        margin-top: 10px;
+        color: #007bff;
+    }
+
+    /* 防止上传和预览按钮重叠的额外样式 */
+    .button-container {
+        display: flex;
+        justify-content: space-between;
+    }
+</style>
+{% endblock %}
+{% block content %}
+<div class="upload-container">
+    <h2>上传数据集</h2>
+    <div class="upload-area" id="uploadArea">
+        点击选择文件或将文件拖拽到这里
+    </div>
+    <input type="file" id="fileInput" accept=".xlsx,.csv">
+    <div class="message" id="message"></div>
+    <div class="message" id="message"></div>
+    <div class="file-name" id="fileName"></div>
+    <div class="button">
+        <button id="previewButton" class="preview-button">预览文件</button>
+        <button id="cancelButton" class="cancel-button">取消预览</button>
+        <button id="uploadButton" class="upload-button">确认文件</button>
+    </div>
+
+    <div class="loading-message" id="loadingMessage">加载中，请稍候...</div>
+    <div id="progress-container" style="display: none;">
+        <progress id="file-progress" value="0" max="100"></progress>
+        <span id="progress-percentage">0%</span>
+    </div>
+
+    <div class="table-container" id="tableContainer">
+        <table id="dataTable"></table>
+    </div>
+    <div class="total-count" id="totalCount"></div>
+</div>
+
+<div id="upload-path" style="display: none">
+    <label for="output_path">保存文件路径：</label>
+    <input type="text" name="output_path" placeholder="请输入文件保存路径" class="form-control mt-3">
+    <button type="submit" class="btn btn-primary mt-3" id="buttonUploadFile">保存文件</button>
+</div>
+
+<script>
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('fileInput');
+    const message = document.getElementById('message');
+    const fileNameDisplay = document.getElementById('fileName');
+    const previewButton = document.getElementById('previewButton');
+    const cancelButton = document.getElementById('cancelButton');
+    const buttonUploadFile = document.getElementById('buttonUploadFile');
+    const uploadButton = document.getElementById('uploadButton');
+    const tableContainer = document.getElementById('tableContainer');
+    const dataTable = document.getElementById('dataTable');
+    const loadingMessage = document.getElementById('loadingMessage');
+    const progressContainer = document.getElementById('progress-container');
+    const fileProgress = document.getElementById('file-progress');
+    const progressPercentage = document.getElementById('progress-percentage');
+    let uploadedFile = null; // 存储上传的文件
+
+    buttonUploadFile.addEventListener('click', () => {
+        progressContainer.style.display = 'none';
+        uploadFile(uploadedFile);
+    })
+
+    uploadArea.addEventListener('click', () => {
+        fileInput.click(); // 点击区域触发文件选择
+    });
+
+    uploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault(); // 防止默认行为
+        uploadArea.style.backgroundColor = '#e8e8e8'; // 拖拽时改变背景
+    });
+
+    uploadArea.addEventListener('dragleave', () => {
+        uploadArea.style.backgroundColor = ''; // 恢复背景
+    });
+
+    uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.style.backgroundColor = ''; // 恢复背景
+        const files = e.dataTransfer.files;
+        handleFiles(files);
+    });
+
+    fileInput.addEventListener('change', (e) => {
+        const files = e.target.files;
+        handleFiles(files);
+    });
+
+    function handleFiles(files) {
+        if (files.length > 0) {
+            const file = files[0];
+            const fileType = file.type;
+            const fileSize = file.size;
+            document.querySelector('.message').style.padding = '10px'
+
+            // 检查文件格式和大小
+            if (!validateFileType(fileType)) {
+                message.textContent = '文件格式不支持，请上传 XLSX 或 CSV 格式的文件。';
+                fileNameDisplay.textContent = ''; // 清空文件名
+                uploadButton.style.display = 'none'; // 隐藏上传按钮
+                previewButton.style.display = 'none'; // 隐藏预览按钮
+                uploadedFile = null; // 清空已上传文件
+                return;
+            } else if (!validateFileSize(fileSize)) {
+                message.textContent = '文件超出大小限制，请确保文件小于 500MB。';
+                fileNameDisplay.textContent = ''; // 清空文件名
+                uploadButton.style.display = 'none'; // 隐藏上传按钮
+                previewButton.style.display = 'none'; // 隐藏预览按钮
+                uploadedFile = null; // 清空已上传文件
+                return;
+            }
+
+            uploadedFile = file; // 保存已上传文件
+            message.textContent = '文件符合！';
+            fileNameDisplay.textContent = `上传的文件：${file.name}`; // 显示文件名
+            uploadButton.style.display = 'block'; // 显示上传按钮
+            previewButton.style.display = 'block'; // 隐藏预览按钮
+        }
+    }
+
+    function validateFileType(fileType) {
+        const validTypes = ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/csv'];
+        return validTypes.includes(fileType) || fileType === '';
+    }
+
+    function validateFileSize(fileSize) {
+        const maxSize = 500 * 1024 * 1024; // 500MB
+        return fileSize <= maxSize;
+    }
+
+    // 点击预览按钮
+    previewButton.addEventListener('click', () => {
+        if (uploadedFile) {
+            loadingMessage.style.display = 'block'; // 显示加载中提示
+            tableContainer.style.display = 'none'; // 隐藏表格
+
+            const formData = new FormData();
+            formData.append('file', uploadedFile);
+            const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+            formData.append('csrf_token', csrfToken);
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/preview', true); // 向后端发送文件进行预览
+
+            xhr.onload = function () {
+                loadingMessage.style.display = 'none';
+                if (xhr.status === 200) {
+                    // 后端返回的数据格式是JSON，解析并展示
+                    const response = JSON.parse(xhr.responseText);
+                    displayTable(response); // 显示预览数据
+                    previewButton.style.display = 'none'; // 隐藏预览按钮
+                    cancelButton.style.display = 'block'; // 显示取消按钮
+                } else {
+                    message.textContent = '预览失败，请重试。';
+                }
+            };
+
+            xhr.send(formData);
+        }
+    });
+
+    // 显示表格数据
+    function displayTable(data) {
+        tableContainer.style.display = 'block'; // 显示表格容器
+        dataTable.innerHTML = ''; // 清空之前的表格数据
+
+        // 创建表头
+        const tableHeader = `<tr>${data.columns.map(col => `<th>${col}</th>`).join('')}</tr>`;
+        dataTable.innerHTML += tableHeader; // 添加表头到表格
+
+        // 创建表格行
+        const numRows = data[data.columns[0]].length; // 假设每列都有相同的行数
+        for (let i = 0; i < numRows; i++) {
+            const tableRow = data.columns.map(col => `<td>${data[col][i]}</td>`).join('');
+            dataTable.innerHTML += `<tr>${tableRow}</tr>`; // 添加行到表格
+        }
+    }
+
+    // 点击取消按钮隐藏表格
+    cancelButton.addEventListener('click', () => {
+        tableContainer.style.display = 'none'; // 隐藏表格
+        cancelButton.style.display = 'none'; // 隐藏取消按钮
+        previewButton.style.display = 'block'; // 显示预览按钮
+    });
+
+    uploadButton.addEventListener('click', () => {
+        progressContainer.style.display = 'none';
+        if (uploadedFile) {
+            document.getElementById('upload-path').style.display = 'block';
+        }
+    });
+
+    function uploadFile(file) {
+        const formData = new FormData();
+        formData.append('path', document.querySelector("#upload-path > input").value)
+        formData.append('file', file);
+        // 获取 CSRF 令牌并添加到 FormData 中
+        // 从 meta 标签中获取 CSRF 令牌
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        formData.append('csrf_token', csrfToken);
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/upload', true);
+
+        xhr.upload.addEventListener('progress', (event) => {
+            if (event.lengthComputable) {
+                const percentComplete = (event.loaded / event.total) * 100;
+                fileProgress.value = percentComplete;
+                progressPercentage.textContent = `${Math.round(percentComplete)}%`;
+                progressContainer.style.display = 'block'; // 显示进度条
+            }
+        });
+
+        xhr.onload = function () {
+            const response = JSON.parse(xhr.responseText); // 解析 JSON 响应
+            if (xhr.status === 200 && response.success) {
+                window.location.href = '/index';
+            } else {
+                message.textContent = response.message || '文件上传失败，请重试。'; // 显示后端返回的错误信息
+            }
+        };
+        xhr.send(formData);
+    }
+</script>
+{% endblock %}

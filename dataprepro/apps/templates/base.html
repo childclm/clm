@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>{% block title %}数据预处理平台{% endblock %}</title>
+    <style>
+        html {
+            height: 100%;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Arial', sans-serif;
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            flex: 1; /* 使 container 占据剩余空间 */
+            width: 100%;
+        }
+
+        .nav-container {
+            background: rgba(107, 102, 98, 0.7);
+            display: flex;
+            justify-content: center;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            padding: 10px 0;
+            width: 100%;
+        }
+
+        nav {
+            display: flex;
+            justify-content: space-around;
+            width: 80%;
+        }
+
+        nav a {
+            color: #fff;
+            text-decoration: none;
+            padding: 12px 20px;
+            border-radius: 25px;
+            transition: background-color 0.3s, transform 0.3s;
+            font-weight: bold;
+        }
+
+        nav a:hover {
+            background-color: rgba(255, 255, 255, 0.3);
+        }
+
+        nav a.active {
+            background-color: rgba(255, 0, 0, 0.5);
+        }
+
+        .content-container {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-image: url('../static/image/index_background_image.jpg');
+            background-size: cover;
+            background-position: center;
+            padding: 20px;
+        }
+
+        .content {
+            text-align: center;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 20px rgba(49, 41, 41, 0.5);
+            max-width: 700px;
+        }
+
+        .footer {
+            background: rgba(107, 102, 98, 0.8);
+            color: #fff;
+            text-align: center;
+            padding: 10px 0;
+            width: 100%;
+        }
+
+        p {
+            font-size: 1.2em;
+        }
+
+        .flash-messages {
+            margin: 10px 0;
+        }
+
+        .flash-messages .alert {
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+
+        .flash-messages .alert-success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .flash-messages .alert-danger {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        .form-control {
+            width: 300px;
+            padding: 10px;
+            border: 2px solid #007BFF;
+            border-radius: 5px;
+            font-size: 16px;
+            background-color: #fff;
+            transition: border-color 0.3s;
+            margin-bottom: 20px; /* 添加底部间距 */
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #0056b3;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            font-size: 16px;
+            color: white;
+            background-color: #6a11cb;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .btn:hover {
+
+            background-color: #2575fc;
+        }
+
+        .mt-3 {
+            margin-top: 15px; /* 为按钮添加顶部间距 */
+        }
+
+    </style>
+    {% block style %}{% endblock %}
+
+</head>
+<body>
+<div class="container">
+    <!-- 导航栏 -->
+    <div class="nav-container">
+        <nav>
+            <a href="{{ url_for('upload_data')}}">文件上传</a>
+            <a href="{{ url_for('data_cleaning')}}">数据清洗</a>
+            <a href="{{ url_for('data_integration')}}">数据集成</a>
+            <a href="{{ url_for('feature_selection')}}">特征选择</a>
+            <a id="logoutButton" class="logout-button">登出</a>
+        </nav>
+    </div>
+
+    <!-- 正文内容 -->
+    <div class="content-container">
+        <div class="content">
+            <!-- 展示flash消息 -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            <div class="flash-messages">
+                {% for message in messages %}
+                <div class="alert alert-success">{{ message[1] }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% endwith %}
+            {% block content %}
+            {% endblock %}
+        </div>
+    </div>
+
+    <!-- 底部 -->
+    <div class="footer">
+        <p>© 2024 数据预处理平台. 保留所有权利。</p>
+    </div>
+</div>
+
+<script>
+    // 自动隐藏 Flash 消息
+    window.onload = function () {
+        var flashMessage = document.querySelector('.flash-messages');
+        if (flashMessage) {
+            setTimeout(function () {
+                flashMessage.style.opacity = '0'; // 先淡出
+                setTimeout(function () {
+                    flashMessage.style.display = 'none'; // 隐藏
+                }, 500); // 等待 0.5 秒后隐藏
+            }, 1500); // 1.5 秒后开始淡出
+        }
+    };
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const links = document.querySelectorAll('nav a');
+        const currentPath = window.location.pathname; // 获取当前路径
+
+        links.forEach(link => {
+            if (currentPath.includes(link.getAttribute('href'))) {
+                link.classList.add('active'); // 为当前链接添加 active 类
+            }
+            link.addEventListener('click', function () {
+                links.forEach(l => l.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+    });
+
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+    const logoutButton = document.getElementById('logoutButton');
+
+    logoutButton.addEventListener('click', () => {
+        fetch('/logout', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken // 包含 CSRF 令牌
+            },
+            credentials: 'same-origin'
+        })
+            .then(response => {
+                if (response.ok) {
+                    window.location.href = '/';  // 登出成功后跳转到登录页面
+                } else {
+                    alert('登出失败，请重试！');
+                }
+            })
+            .catch(error => {
+                console.error('登出请求失败:', error); // 打印错误信息
+                alert('登出请求失败，请重试！');
+            });
+    });
+
+</script>
+</body>
+</html>

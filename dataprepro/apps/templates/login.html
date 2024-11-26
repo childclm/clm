@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>Login</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-image: url("../static/image/login_background_image.png");
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            height: 100vh;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            width: 400px;
+            background-color: rgba(255, 255, 255, 0.9);
+            border-radius: 10px;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            text-align: center;
+        }
+
+        h2 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        label {
+            display: block;
+            text-align: left;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        input[type="text"],
+        input[type="password"],
+        .captcha-container input[type="text"] {
+            width: calc(100% - 0px); /* 保持所有输入框的宽度一致 */
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            height: 40px;
+            box-sizing: border-box;
+        }
+
+        input[type="text"]:focus,
+        input[type="password"]:focus,
+        .captcha-container input[type="text"]:focus {
+            border: 1px solid #6a11cb;
+            outline: none;
+        }
+
+        .login {
+            width: 100%;
+            padding: 10px;
+            background-color: #6a11cb;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        input[type="submit"]:hover {
+            background-color: #2575fc;
+        }
+
+        .captcha-container {
+            display: flex;
+            align-items: center;
+            /*justify-content: center; !* 保证验证码输入框和图片左对齐 *!*/
+        }
+
+        .captcha-container input[type="text"] {
+            /*flex: 1; !* 确保输入框填满可用空间 *!*/
+            margin-right: 10px;
+            display: block;
+            /*display: flex;*/
+            height: 40px; /* 统一高度 */
+
+        }
+
+        .captcha-img {
+            cursor: pointer;
+            /*display: block;*/
+            box-sizing: border-box;
+            margin-bottom:15px;
+            height: 40px; /* 保持与输入框高度一致 */
+            width: 100px; /* 固定宽度 */
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            object-fit: cover; /* 保证图片适应框 */
+            display: flex;
+        }
+
+        .flash-messages {
+            margin: 10px 0;
+        }
+
+        .flash-messages .alert {
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+
+        .flash-messages .alert-success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .flash-messages .alert-danger {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <form action="/" method="POST">
+        {{ form.hidden_tag() }}
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <h2>数据预处理平台</h2>
+
+        <!-- 展示flash消息 -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="flash-messages">
+            {% for message in messages %}
+            <div class="alert alert-success">{{ message[1] }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+        <label for="username">账号</label>
+        <input type="text" id="username" name="username" value="{{ form.username.data if form.username.data else '' }}" required>
+        <label for="password">密码</label>
+        <input type="password" id="password" name="password" value="{{ form.password.data if form.password.data else '' }}" required>
+        <label for="captcha">验证码</label>
+        <div class="captcha-container">
+            <input type="text" id="captcha" name="captcha" value="{{ form.captcha.data if form.captcha.data else '' }}" required>
+            <img id="captcha-img" class="captcha-img" src="/get_code" alt="验证码" onclick="reloadCaptcha()">
+        </div>
+        <button class="login" type="submit">登陆</button>
+    </form>
+</div>
+
+<script>
+    // 刷新验证码图片
+    function reloadCaptcha() {
+        document.getElementById('captcha-img').src = '/get_code?' + Math.random();
+    }
+
+    // 自动隐藏 Flash 消息
+    window.onload = function () {
+        var flashMessage = document.querySelector('.flash-messages');
+        if (flashMessage) {
+            setTimeout(function () {
+                flashMessage.style.opacity = '0'; // 先淡出
+                setTimeout(function () {
+                    flashMessage.style.display = 'none'; // 隐藏
+                }, 500); // 等待 0.5 秒后隐藏
+            }, 1500); // 1.5 秒后开始淡出
+        }
+    };
+</script>
+</body>
+</html>
